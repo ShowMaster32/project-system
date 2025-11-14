@@ -4,9 +4,9 @@ namespace App\Filament\Resources\WorkPackages\Pages;
 
 use App\Filament\Resources\WorkPackages\WorkPackageResource;
 use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\ManageRecords;
 
-class ListWorkPackages extends ListRecords
+class ManageWorkPackages extends ManageRecords
 {
     protected static string $resource = WorkPackageResource::class;
 

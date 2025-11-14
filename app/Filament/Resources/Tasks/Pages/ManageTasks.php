@@ -4,9 +4,9 @@ namespace App\Filament\Resources\Tasks\Pages;
 
 use App\Filament\Resources\Tasks\TaskResource;
 use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\ManageRecords;
 
-class ListTasks extends ListRecords
+class ManageTasks extends ManageRecords
 {
     protected static string $resource = TaskResource::class;
 
