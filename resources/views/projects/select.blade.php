@@ -1,101 +1,64 @@
+@php($title = 'Seleziona Progetto')
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seleziona Progetto - Project System</title>
+    <title>{{ $title }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50">
-    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl w-full space-y-8">
-            <!-- Header -->
-            <div class="text-center">
-                <h1 class="text-4xl font-bold text-gray-900">
-                    Benvenuto, {{ auth()->user()->name }}!
-                </h1>
-                <p class="mt-2 text-lg text-gray-600">
-                    Seleziona il progetto su cui vuoi lavorare
-                </p>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-3xl mx-auto py-10 px-4">
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">{{ $title }}</h1>
+            <p class="text-gray-600 mt-1">Scegli il progetto con cui lavorare. I dati e i permessi saranno filtrati automaticamente.</p>
+        </div>
+
+        @if (session('error'))
+            <div class="mb-4 rounded bg-red-50 border border-red-200 text-red-700 px-4 py-3">
+                {{ session('error') }}
             </div>
+        @endif
 
-            <!-- Messages -->
-            @if(session('error'))
-                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-                    {{ session('error') }}
-                </div>
-            @endif
+        @if (session('success'))
+            <div class="mb-4 rounded bg-green-50 border border-green-200 text-green-700 px-4 py-3">
+                {{ session('success') }}
+            </div>
+        @endif
 
-            @if(session('warning'))
-                <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
-                    {{ session('warning') }}
-                </div>
-            @endif
-
-            <!-- Projects Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                @forelse($projects as $project)
-                    <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow border-2 {{ $project->id === $lastProjectId ? 'border-blue-500' : 'border-transparent' }}">
-                        <div class="p-6">
-                            <!-- Badge per ultimo progetto -->
-                            @if($project->id === $lastProjectId)
-                                <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mb-3">
-                                    Ultimo accesso
-                                </span>
-                            @endif
-
-                            <!-- Project Info -->
-                            <h3 class="text-xl font-semibold text-gray-900 mb-2">
-                                {{ $project->name }}
-                            </h3>
-                            
-                            <p class="text-sm text-gray-600 mb-1">
-                                <strong>Codice:</strong> {{ $project->code }}
-                            </p>
-
-                            @if($project->description)
-                                <p class="text-sm text-gray-500 mb-4 line-clamp-2">
-                                    {{ $project->description }}
-                                </p>
-                            @endif
-
-                            <!-- Role Badge -->
-                            <div class="mb-4">
-                                <span class="inline-block bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full">
-                                    {{ ucfirst($project->pivot->role) }}
-                                </span>
+        @if ($projects->isEmpty())
+            <div class="rounded bg-white shadow p-6">
+                <p class="text-gray-700">Non hai progetti disponibili. Contatta un amministratore.</p>
+            </div>
+        @else
+            <div class="grid gap-4">
+                @foreach ($projects as $project)
+                    <div class="rounded bg-white shadow p-5 flex items-center justify-between">
+                        <div>
+                            <div class="flex items-center gap-3">
+                                <h2 class="text-lg font-semibold text-gray-800">{{ $project->name }}</h2>
+                                @if (isset($lastProjectId) && $lastProjectId === $project->id)
+                                    <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">Ultimo usato</span>
+                                @endif
                             </div>
-
-                            <!-- Enter Button -->
-                            <form action="{{ route('projects.enter', $project) }}" method="POST">
+                            <p class="text-sm text-gray-600 mt-1">Codice: {{ $project->code }}</p>
+                            <p class="text-sm text-gray-600">Ruolo: <span class="font-medium">{{ ucfirst($project->pivot->role) }}</span></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <form action="{{ route('projects.enter', ['project' => $project->id]) }}" method="POST">
                                 @csrf
-                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors">
-                                    Entra nel Progetto
+                                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                                    Entra
                                 </button>
                             </form>
                         </div>
                     </div>
-                @empty
-                    <div class="col-span-full text-center py-12">
-                        <p class="text-gray-500 text-lg">
-                            Non hai accesso a nessun progetto.
-                        </p>
-                        <p class="text-gray-400 text-sm mt-2">
-                            Contatta l'amministratore per ottenere l'accesso.
-                        </p>
-                    </div>
-                @endforelse
+                @endforeach
             </div>
+        @endif
 
-            <!-- Logout -->
-            <div class="text-center pt-4">
-                <form action="{{ route('filament.admin.auth.logout') }}" method="POST" class="inline">
-                    @csrf
-                    <button type="submit" class="text-gray-600 hover:text-gray-900 text-sm">
-                        Logout
-                    </button>
-                </form>
-            </div>
+        <div class="mt-8 text-center text-sm text-gray-500">
+            <a href="{{ route('filament.admin.auth.logout') }}" class="underline">Esci</a>
         </div>
     </div>
 </body>

@@ -69,8 +69,14 @@ class ProjectSelectionController extends Controller
         // Aggiorna last_project_id dell'utente
         $user->update(['last_project_id' => $project->id]);
 
-        return redirect()->route('filament.admin.pages.dashboard')
-            ->with('success', "Benvenuto in {$project->name}");
+        // ✅ Redirect al panel corretto in base al ruolo
+        if ($project->pivot->role === 'admin') {
+            return redirect()->route('filament.admin.pages.dashboard')
+                ->with('success', "Benvenuto in {$project->name}");
+        } else {
+            return redirect()->route('filament.user.pages.dashboard')
+                ->with('success', "Benvenuto in {$project->name}");
+        }
     }
 
     /**

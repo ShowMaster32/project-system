@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\WorkPackages\Pages;
+namespace App\Filament\User\Resources\WorkPackages\Pages;
 
-use App\Filament\Resources\WorkPackages\WorkPackageResource;
+use App\Filament\User\Resources\WorkPackages\WorkPackageResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 
@@ -12,8 +12,11 @@ class ManageWorkPackages extends ManageRecords
 
     protected function getHeaderActions(): array
     {
+        $role = session('current_user_role');
+        $canCreate = in_array($role, ['admin', 'coordinator']);
+
         return [
-            CreateAction::make(),
+            CreateAction::make()->visible($canCreate),
         ];
     }
 }
