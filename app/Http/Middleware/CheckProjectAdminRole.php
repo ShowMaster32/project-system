@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Filament\Facades\Filament;
 
 class CheckProjectAdminRole
 {
@@ -14,9 +15,19 @@ class CheckProjectAdminRole
     public function handle(Request $request, Closure $next): Response
     {
         $user = auth()->user();
-        
+
+        // Consenti le rotte di autenticazione di Filament (login, logout, password...) per evitare loop
+        if ($request->routeIs('filament.*.auth.*')) {
+            return $next($request);
+        }
+
         if (!$user) {
-            return redirect()->route('filament.admin.auth.login');
+            $loginUrl = Filament::getCurrentPanel()?->getLoginUrl();
+            if (!$loginUrl) {
+                $path = trim($request->path(), '/');
+                $loginUrl = str_starts_with($path, 'admin') ? url('/admin/login') : url('/app/login');
+            }
+            return redirect()->to($loginUrl);
         }
 
         // Se non ha un progetto selezionato, redirect a selezione

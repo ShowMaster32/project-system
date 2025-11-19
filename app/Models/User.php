@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_active',
     ];
 
     /**
@@ -43,7 +44,37 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    protected static function booted()
+    {
+        static::deleting(function (self $user) {
+            try {
+                \DB::table('archived_users')->insert([
+                    'original_user_id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'is_active' => (bool) $user->is_active,
+                    'deleted_by' => auth()->id(),
+                    'deleted_at' => now(),
+                    'data_json' => json_encode([
+                        'attributes' => $user->getAttributes(),
+                    ]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (\Throwable $e) {
+                // Fail-safe: do not block deletion if archive fails
+            }
+        });
+    }
+
+    public function isGlobalAdmin(): bool
+    {
+        $emails = config('pmt.global_admin_emails', []);
+        return in_array($this->email, $emails, true);
     }
 
     // CLassi aggiunte

@@ -13,7 +13,7 @@ class ProjectSelectionController extends Controller
     public function select()
     {
         $user = auth()->user();
-        
+
         // Progetti accessibili dall'utente
         $projects = $user->projects()
             ->where('project_user.is_active', true)
@@ -69,14 +69,11 @@ class ProjectSelectionController extends Controller
         // Aggiorna last_project_id dell'utente
         $user->update(['last_project_id' => $project->id]);
 
-        // ✅ Redirect al panel corretto in base al ruolo
-        if ($project->pivot->role === 'admin') {
-            return redirect()->route('filament.admin.pages.dashboard')
-                ->with('success', "Benvenuto in {$project->name}");
-        } else {
-            return redirect()->route('filament.user.pages.dashboard')
-                ->with('success', "Benvenuto in {$project->name}");
-        }
+        // ✅ Redirect al pannello User per coerenza con l'UX richiesta
+        // Gli admin potranno comunque accedere all'area /admin se necessario,
+        // ma l'ingresso standard dopo la selezione progetto punta a /app.
+        return redirect()->route('filament.user.pages.dashboard')
+            ->with('success', "Benvenuto in {$project->name}");
     }
 
     /**

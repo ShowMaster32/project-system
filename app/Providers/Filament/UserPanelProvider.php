@@ -41,6 +41,7 @@ class UserPanelProvider extends PanelProvider
                 AccountWidget::class,
                 ProjectInfoWidget::class,
             ])
+            ->topNavigation()
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
