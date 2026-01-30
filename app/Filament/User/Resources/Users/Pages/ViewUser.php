@@ -3,8 +3,8 @@
 namespace App\Filament\User\Resources\Users\Pages;
 
 use App\Filament\User\Resources\Users\UserResource;
+use Filament\Actions;
 use Filament\Infolists\Components\Grid;
-use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
@@ -16,59 +16,130 @@ class ViewUser extends ViewRecord
 
     public function getTitle(): string
     {
-        return 'User Details';
+        return 'User Details: ' . $this->record->name;
+    }
+
+    protected function getHeaderActions(): array
+    {
+        $role = session('current_user_role');
+        $isGlobalAdmin = auth()->user()?->isGlobalAdmin();
+        $canManage = ($role === 'admin') || $isGlobalAdmin;
+
+        return [
+            Actions\EditAction::make()
+                ->visible($canManage),
+        ];
     }
 
     public function infolist(Schema $schema): Schema
     {
-        $record = $this->getRecord();
-
-        // Build a textual list of projects with role and membership state
-        $memberships = $record->projects()
-            ->select(['projects.id', 'projects.name', 'projects.code'])
-            ->withPivot(['role', 'is_active'])
-            ->get()
-            ->map(function ($p) {
-                $status = $p->pivot->is_active ? 'active' : 'inactive';
-                return ($p->code ? ($p->code . ' – ') : '') . $p->name . " (role: {$p->pivot->role}, {$status})";
-            })
-            ->toArray();
+        $record = $this->record;
+        $currentProjectId = session('current_project_id');
+        $isGlobalAdmin = $record->isGlobalAdmin();
 
         return $schema
             ->schema([
-                Section::make('User')
+                Section::make('User Information')
                     ->schema([
-                        Grid::make(2)->schema([
-                            TextEntry::make('id')->label('User ID'),
-                            TextEntry::make('name')->label('Username'),
-                            TextEntry::make('email')->label('User Email'),
-                            TextEntry::make('current_role')->label('User Role')->default(function () use ($record) {
-                                $currentProjectId = session('current_project_id');
-                                if (!$currentProjectId) return '—';
-                                return $record->projects()
-                                    ->where('project_id', $currentProjectId)
-                                    ->first()?->pivot?->role ?? '—';
-                            }),
-                            TextEntry::make('access_level')->label('User Access Level')->default(function () use ($record) {
-                                return $record->isGlobalAdmin() ? 'Global Admin' : ucfirst(session('current_user_role', 'user'));
-                            }),
-                            TextEntry::make('created_at')->label('Created at')->dateTime(),
-                            TextEntry::make('updated_at')->label('Updated at')->dateTime(),
-                        ]),
-                    ]),
-                Section::make('Projects')
+                        Grid::make(2)
+                            ->schema([
+                                TextEntry::make('id')
+                                    ->label('User ID'),
+                                    
+                                TextEntry::make('name')
+                                    ->label('Username')
+                                    ->weight('bold'),
+                                    
+                                TextEntry::make('email')
+                                    ->label('Email Address')
+                                    ->icon('heroicon-o-envelope')
+                                    ->copyable(),
+                                    
+                                TextEntry::make('is_active')
+                                    ->label('Account Status')
+                                    ->badge()
+                                    ->color(fn (bool $state): string => $state ? 'success' : 'danger')
+                                    ->formatStateUsing(fn (bool $state): string => $state ? 'Active' : 'Inactive'),
+                                    
+                                TextEntry::make('access_level')
+                                    ->label('Access Level')
+                                    ->badge()
+                                    ->color(fn (): string => $isGlobalAdmin ? 'warning' : 'info')
+                                    ->default(function () use ($isGlobalAdmin) {
+                                        if ($isGlobalAdmin) {
+                                            return 'Global Administrator';
+                                        }
+                                        $role = session('current_user_role', 'user');
+                                        return ucfirst($role);
+                                    }),
+                                    
+                                TextEntry::make('created_at')
+                                    ->label('Created At')
+                                    ->dateTime('d/m/Y H:i'),
+                                    
+                                TextEntry::make('updated_at')
+                                    ->label('Last Updated')
+                                    ->dateTime('d/m/Y H:i')
+                                    ->since(),
+                            ]),
+                    ])
+                    ->collapsible(),
+
+                Section::make('Current Project Role')
                     ->schema([
-                        KeyValueEntry::make('projects_list')
-                            ->label('Projects Memberships')
-                            ->default(function () use ($memberships) {
-                                $arr = [];
-                                foreach ($memberships as $i => $line) {
-                                    $arr[(string) ($i + 1)] = $line;
-                                }
-                                return $arr;
+                        TextEntry::make('current_role')
+                            ->label('Role in Current Project')
+                            ->badge()
+                            ->color(fn (string $state): string => match($state) {
+                                'admin' => 'danger',
+                                'coordinator' => 'warning',
+                                'wp_leader' => 'info',
+                                'task_leader' => 'success',
+                                default => 'gray',
                             })
-                            ->columnSpanFull(),
-                    ]),
+                            ->default(function () use ($record, $currentProjectId) {
+                                if (!$currentProjectId) {
+                                    return 'No project selected';
+                                }
+                                
+                                $role = $record->getRoleInProject($currentProjectId);
+                                return $role ? ucfirst(str_replace('_', ' ', $role)) : 'No role assigned';
+                            }),
+                    ])
+                    ->visible(fn () => $currentProjectId !== null)
+                    ->collapsible(),
+
+                Section::make('All Project Memberships')
+                    ->schema([
+                        TextEntry::make('projects_list')
+                            ->label('Projects')
+                            ->default(function () use ($record) {
+                                $projects = $record->projects()
+                                    ->select(['projects.id', 'projects.code', 'projects.name'])
+                                    ->withPivot(['role', 'is_active'])
+                                    ->orderBy('projects.name')
+                                    ->get();
+
+                                if ($projects->isEmpty()) {
+                                    return 'No project memberships';
+                                }
+
+                                return $projects->map(function ($project) {
+                                    $status = $project->pivot->is_active ? '✓ Active' : '✗ Inactive';
+                                    $role = ucfirst(str_replace('_', ' ', $project->pivot->role));
+                                    $code = $project->code ? "[{$project->code}] " : '';
+                                    
+                                    return "{$code}{$project->name} — Role: {$role} ({$status})";
+                                })->join("\n");
+                            })
+                            ->columnSpanFull()
+                            ->html()
+                            ->formatStateUsing(fn (string $state): string => 
+                                '<div class="whitespace-pre-line">' . e($state) . '</div>'
+                            ),
+                    ])
+                    ->collapsible()
+                    ->collapsed(false),
             ]);
     }
 }

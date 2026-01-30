@@ -8,10 +8,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
-use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -28,9 +24,17 @@ class UserResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
-            TextInput::make('name')->label('Name')->required()->maxLength(255),
-            TextInput::make('email')->label('Email')->email()->required()->maxLength(255),
-            // Password only on create; for edit we expose a Change Password action on the page
+            TextInput::make('name')
+                ->label('Name')
+                ->required()
+                ->maxLength(255),
+
+            TextInput::make('email')
+                ->label('Email')
+                ->email()
+                ->required()
+                ->maxLength(255),
+
             TextInput::make('password')
                 ->label('Password')
                 ->password()
@@ -38,39 +42,73 @@ class UserResource extends Resource
                 ->required(fn (string $operation) => $operation === 'create')
                 ->visible(fn (string $operation) => $operation === 'create')
                 ->dehydrateStateUsing(fn ($state) => $state ? bcrypt($state) : null),
-            Toggle::make('is_active')->label('Active')->default(true),
+
+            Toggle::make('is_active')
+                ->label('Active')
+                ->default(true),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         $currentProjectId = session('current_project_id');
+        $role = session('current_user_role');
+        $isGlobalAdmin = auth()->user()?->isGlobalAdmin();
+        $canManage = ($role === 'admin') || $isGlobalAdmin;
 
         return $table
             ->columns([
-                TextColumn::make('id')->label('ID')->sortable(),
-                TextColumn::make('name')->label('Name')->searchable()->sortable(),
-                TextColumn::make('email')->label('Email')->searchable()->sortable(),
-                TextColumn::make('current_role')
+                Tables\Columns\TextColumn::make('id')
+                    ->label('ID')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Name')
+                    ->searchable()
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('email')
+                    ->label('Email')
+                    ->searchable()
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('current_role')
                     ->label('Role')
                     ->getStateUsing(function (User $record) use ($currentProjectId) {
                         if ($record->current_role) {
-                            return $record->current_role;
+                            return ucfirst(str_replace('_', ' ', $record->current_role));
                         }
                         if ($currentProjectId) {
-                            // Fallback fetch (should rarely run if query is built properly)
                             $role = $record->projects()
                                 ->where('project_id', $currentProjectId)
                                 ->first()?->pivot?->role;
-                            return $role ?: '—';
+                            return $role ? ucfirst(str_replace('_', ' ', $role)) : '—';
                         }
                         return '—';
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match($state) {
+                        'Admin' => 'danger',
+                        'Coordinator' => 'warning',
+                        'Wp leader' => 'info',
+                        'Task leader' => 'success',
+                        default => 'gray',
                     }),
-                TextColumn::make('created_at')->label('Created')->dateTime()->sortable(),
-                TextColumn::make('updated_at')->label('Updated')->dateTime()->sortable(),
+
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Created')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('updated_at')
+                    ->label('Updated')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                TernaryFilter::make('is_active')
+                Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active')
                     ->queries(
                         true: fn (Builder $query) => $query->where('users.is_active', true),
@@ -79,16 +117,20 @@ class UserResource extends Resource
                     ),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Show'),
+                Tables\Actions\ViewAction::make()
+                    ->label('Show'),
+
                 Tables\Actions\EditAction::make()
-                    ->visible(fn () => session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin()),
+                    ->visible($canManage),
+
                 Tables\Actions\DeleteAction::make()
-                    ->visible(fn () => session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin()),
+                    ->visible($canManage),
             ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make()
-                    ->label('New User')
-                    ->visible(fn () => session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin()),
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible($canManage),
+                ]),
             ]);
     }
 
@@ -109,7 +151,6 @@ class UserResource extends Resource
         $currentProjectId = session('current_project_id');
         $user = auth()->user();
 
-        // Select current role from pivot for the current project (left join to show role or dash)
         if ($currentProjectId) {
             $query->leftJoin('project_user as pu', function ($join) use ($currentProjectId) {
                 $join->on('pu.user_id', '=', 'users.id')
@@ -119,7 +160,6 @@ class UserResource extends Resource
             $query->addSelect(['current_role' => \DB::raw('pu.role')]);
         }
 
-        // Project admins: restrict to users that belong to current project; Global admins: see all
         $isProjectAdmin = session('current_user_role') === 'admin';
         $isGlobalAdmin = method_exists($user, 'isGlobalAdmin') && $user?->isGlobalAdmin();
 

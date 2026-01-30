@@ -3,8 +3,8 @@
 namespace App\Filament\User\Resources\Users\Pages;
 
 use App\Filament\User\Resources\Users\UserResource;
-use Filament\Resources\Pages\ListRecords;
 use Filament\Actions;
+use Filament\Resources\Pages\ListRecords;
 
 class ListUsers extends ListRecords
 {
@@ -12,15 +12,27 @@ class ListUsers extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        $role = session('current_user_role');
+        $isGlobalAdmin = auth()->user()?->isGlobalAdmin();
+
+        // Solo admin del progetto o global admin possono creare utenti
+        $canCreate = ($role === 'admin') || $isGlobalAdmin;
+
         return [
             Actions\CreateAction::make()
                 ->label('New User')
-                ->visible(fn () => session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin()),
+                ->visible($canCreate),
         ];
     }
 
-    public function getSubheading(): string | null
+    public function getTitle(): string
     {
-        return 'Showing All Users';
+        return 'Users';
+    }
+
+    public function getSubheading(): ?string
+    {
+        $projectName = session('current_project_name', 'Current Project');
+        return "Managing users for {$projectName}";
     }
 }
