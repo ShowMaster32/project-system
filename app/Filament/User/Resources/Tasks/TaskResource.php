@@ -1,28 +1,23 @@
 <?php
 
-namespace App\Filament\Resources\Tasks;
+namespace App\Filament\User\Resources\Tasks;
 
-use App\Filament\Resources\Tasks\Pages\ManageTasks;
+use App\Filament\User\Resources\Tasks\Pages\ManageTasks;
 use App\Models\Task;
-use BackedEnum;
+use App\Models\WorkPackage;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -31,122 +26,137 @@ class TaskResource extends Resource
 {
     protected static ?string $model = Task::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-check-circle';
 
-    protected static ?string $recordTitleAttribute = 'project-system';
+    protected static ?string $navigationLabel = 'Task';
+
+    protected static ?int $navigationSort = 3;
+
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Progetto';
+    }
 
     public static function form(Schema $schema): Schema
     {
+        $projectId = session('current_project_id');
+
         return $schema
             ->components([
-                TextInput::make('project_id')
+                Select::make('work_package_id')
+                    ->label('Work Package')
+                    ->options(function () use ($projectId) {
+                        return WorkPackage::when($projectId, fn ($q) => $q->where('project_id', $projectId))
+                            ->pluck('name', 'id');
+                    })
                     ->required()
-                    ->numeric(),
-                TextInput::make('work_package_id')
-                    ->required()
-                    ->numeric(),
-                TextInput::make('parent_id')
-                    ->numeric(),
-                TextInput::make('code'),
+                    ->searchable(),
+
+                TextInput::make('code')
+                    ->label('Codice')
+                    ->maxLength(50),
+
                 TextInput::make('name')
-                    ->required(),
-                Textarea::make('description')
-                    ->columnSpanFull(),
-                TextInput::make('leader_id')
-                    ->numeric(),
-                TextInput::make('assigned_to')
-                    ->numeric(),
-                DatePicker::make('start_date')
-                    ->required(),
-                DatePicker::make('end_date')
-                    ->required(),
-                TextInput::make('duration_days')
-                    ->numeric(),
-                TextInput::make('depends_on')
+                    ->label('Nome')
                     ->required()
-                    ->default('[]'),
-                TextInput::make('status')
+                    ->maxLength(255),
+
+                Textarea::make('description')
+                    ->label('Descrizione')
+                    ->columnSpanFull(),
+
+                DatePicker::make('start_date')
+                    ->label('Data Inizio')
+                    ->required(),
+
+                DatePicker::make('end_date')
+                    ->label('Data Fine')
+                    ->required(),
+
+                TextInput::make('duration_days')
+                    ->label('Durata (giorni)')
+                    ->numeric(),
+
+                Select::make('status')
+                    ->label('Stato')
+                    ->options([
+                        'pending'     => 'In attesa',
+                        'in_progress' => 'In corso',
+                        'completed'   => 'Completato',
+                        'on_hold'     => 'In pausa',
+                        'cancelled'   => 'Annullato',
+                    ])
                     ->required()
                     ->default('pending'),
+
                 TextInput::make('progress')
+                    ->label('Avanzamento (%)')
                     ->required()
                     ->numeric()
+                    ->minValue(0)
+                    ->maxValue(100)
                     ->default(0),
-                TextInput::make('color'),
+
                 Toggle::make('is_critical_path')
-                    ->required(),
+                    ->label('Percorso critico')
+                    ->default(false),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('project-system')
             ->columns([
-                TextColumn::make('project_id')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('work_package_id')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('parent_id')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('code')
+                    ->label('Codice')
                     ->searchable(),
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('leader_id')
-                    ->numeric()
+                    ->label('Nome')
+                    ->searchable()
                     ->sortable(),
-                TextColumn::make('assigned_to')
-                    ->numeric()
+                TextColumn::make('workPackage.name')
+                    ->label('Work Package')
                     ->sortable(),
                 TextColumn::make('start_date')
-                    ->date()
+                    ->label('Inizio')
+                    ->date('d/m/Y')
                     ->sortable(),
                 TextColumn::make('end_date')
-                    ->date()
-                    ->sortable(),
-                TextColumn::make('duration_days')
-                    ->numeric()
+                    ->label('Fine')
+                    ->date('d/m/Y')
                     ->sortable(),
                 TextColumn::make('status')
+                    ->label('Stato')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'in_progress' => 'info',
+                        'completed'   => 'success',
+                        'on_hold'     => 'warning',
+                        'cancelled'   => 'danger',
+                        default       => 'gray',
+                    })
                     ->searchable(),
                 TextColumn::make('progress')
+                    ->label('%')
                     ->numeric()
-                    ->sortable(),
-                TextColumn::make('color')
-                    ->searchable(),
+                    ->sortable()
+                    ->suffix('%'),
                 IconColumn::make('is_critical_path')
+                    ->label('Critico')
                     ->boolean(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([
-                TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
+                EditAction::make()
+                    ->visible(fn () => auth()->user()?->hasProjectPermission('tasks.edit')),
+                DeleteAction::make()
+                    ->visible(fn () => auth()->user()?->hasProjectPermission('tasks.delete')),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()?->hasProjectPermission('tasks.delete')),
                 ]),
             ]);
     }
@@ -158,11 +168,33 @@ class TaskResource extends Resource
         ];
     }
 
-    public static function getRecordRouteBindingEloquentQuery(): Builder
+    public static function getEloquentQuery(): Builder
     {
-        return parent::getRecordRouteBindingEloquentQuery()
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+        $query = parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
+        $projectId = session('current_project_id');
+        if ($projectId) {
+            $query->where('project_id', $projectId);
+        }
+        return $query;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->hasProjectPermission('tasks.create') ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('tasks.edit') ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('tasks.delete') ?? false;
+    }
+
+    public static function canView($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('tasks.view') ?? false;
     }
 }

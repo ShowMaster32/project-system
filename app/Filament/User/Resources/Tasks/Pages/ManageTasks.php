@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\Tasks\Pages;
+namespace App\Filament\User\Resources\Tasks\Pages;
 
-use App\Filament\Resources\Tasks\TaskResource;
+use App\Filament\User\Resources\Tasks\TaskResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 

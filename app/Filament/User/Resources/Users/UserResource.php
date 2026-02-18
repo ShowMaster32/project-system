@@ -3,6 +3,11 @@
 namespace App\Filament\User\Resources\Users;
 
 use App\Models\User;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -116,19 +121,19 @@ class UserResource extends Resource
                         blank: fn (Builder $query) => $query,
                     ),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make()
+            ->recordActions([
+                ViewAction::make()
                     ->label('Show'),
 
-                Tables\Actions\EditAction::make()
+                EditAction::make()
                     ->visible($canManage),
 
-                Tables\Actions\DeleteAction::make()
+                DeleteAction::make()
                     ->visible($canManage),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
                         ->visible($canManage),
                 ]),
             ]);
@@ -152,12 +157,15 @@ class UserResource extends Resource
         $user = auth()->user();
 
         if ($currentProjectId) {
-            $query->leftJoin('project_user as pu', function ($join) use ($currentProjectId) {
-                $join->on('pu.user_id', '=', 'users.id')
-                    ->where('pu.project_id', '=', $currentProjectId);
-            });
-            $query->addSelect('users.*');
-            $query->addSelect(['current_role' => \DB::raw('pu.role')]);
+            // Subquery scalare invece di LEFT JOIN per evitare l'ambiguità
+            // della colonna "id" su PostgreSQL quando Filament aggiunge WHERE id = ?
+            $query->addSelect([
+                'current_role' => \DB::table('project_user as pu')
+                    ->select('pu.role')
+                    ->whereColumn('pu.user_id', 'users.id')
+                    ->where('pu.project_id', $currentProjectId)
+                    ->limit(1),
+            ]);
         }
 
         $isProjectAdmin = session('current_user_role') === 'admin';
@@ -177,21 +185,26 @@ class UserResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'ArtemisWorkspace';
+        return 'Amministrazione';
     }
 
     public static function canCreate(): bool
     {
-        return session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin();
+        return auth()->user()?->hasProjectPermission('users.create') ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin();
+        return auth()->user()?->hasProjectPermission('users.edit') ?? false;
     }
 
     public static function canDelete($record): bool
     {
-        return session('current_user_role') === 'admin' || auth()->user()?->isGlobalAdmin();
+        return auth()->user()?->hasProjectPermission('users.delete') ?? false;
+    }
+
+    public static function canView($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('users.view') ?? false;
     }
 }

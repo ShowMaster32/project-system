@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Resources\Projects;
+namespace App\Filament\User\Resources\Projects;
 
-use App\Filament\Resources\Projects\Pages\ManageProjects;
+use App\Filament\User\Resources\Projects\Pages\ManageProjects;
 use App\Models\Project;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
@@ -32,7 +32,16 @@ class ProjectResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'project-system';
+    protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?string $navigationLabel = 'Progetti';
+
+    protected static ?int $navigationSort = 1;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Progetto';
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -58,7 +67,6 @@ class ProjectResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('project-system')
             ->columns([
                 TextColumn::make('code')
                     ->searchable(),
@@ -122,5 +130,27 @@ class ProjectResource extends Resource
             ->whereHas('users', function ($query) {
                 $query->where('user_id', auth()->id());
             });
+    }
+
+    public static function canCreate(): bool
+    {
+        // Solo super admin e global admin possono creare progetti
+        $user = auth()->user();
+        return $user?->isGlobalAdmin() || $user?->hasRole('super_admin');
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('projects.edit') ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('projects.delete') ?? false;
+    }
+
+    public static function canView($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('projects.view') ?? false;
     }
 }

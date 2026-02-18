@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DocumentDownloadController;
 use App\Http\Controllers\ProjectSelectionController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,4 +24,10 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/projects/switch', [ProjectSelectionController::class, 'switch'])
         ->name('projects.switch');
+
+    // Document download/preview routes (autenticato, con check permessi interno)
+    Route::get('/documents/{document}/download', [DocumentDownloadController::class, 'download'])
+        ->name('documents.download');
+    Route::get('/documents/{document}/preview', [DocumentDownloadController::class, 'preview'])
+        ->name('documents.preview');
 });

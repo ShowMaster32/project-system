@@ -61,6 +61,7 @@ class UserPanelProvider extends PanelProvider
             ->navigationGroups([
                 'Progetto',
                 'Documenti',
+                'Amministrazione',
             ]);
     }
 }

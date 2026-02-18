@@ -4,11 +4,11 @@ namespace App\Filament\User\Resources\Users\Pages;
 
 use App\Filament\User\Resources\Users\UserResource;
 use Filament\Actions;
-use Filament\Infolists\Components\Grid;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Schema;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 
 class ViewUser extends ViewRecord
 {

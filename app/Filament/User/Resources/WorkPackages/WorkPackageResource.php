@@ -4,14 +4,15 @@ namespace App\Filament\User\Resources\WorkPackages;
 
 use App\Filament\User\Resources\WorkPackages\Pages\ManageWorkPackages;
 use App\Models\WorkPackage;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Schemas\Schema;
 use Filament\Resources\Resource;
-// use Filament\Support\Icons\Heroicon; // Switched to string icon to avoid version mismatches
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\EditAction;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,36 +24,59 @@ class WorkPackageResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
 
+    protected static ?string $navigationLabel = 'Work Package';
+
+    protected static ?int $navigationSort = 2;
+
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Progetto';
+    }
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->schema([
                 TextInput::make('code')
+                    ->label('Codice')
                     ->maxLength(50),
                 TextInput::make('name')
+                    ->label('Nome')
                     ->required()
                     ->maxLength(255),
                 Textarea::make('description')
+                    ->label('Descrizione')
                     ->columnSpanFull(),
-                TextInput::make('leader_id')
-                    ->numeric(),
                 DatePicker::make('start_date')
+                    ->label('Data Inizio')
                     ->required(),
                 DatePicker::make('end_date')
+                    ->label('Data Fine')
                     ->required(),
                 TextInput::make('duration_days')
+                    ->label('Durata (giorni)')
                     ->numeric(),
-                TextInput::make('status')
+                Select::make('status')
+                    ->label('Stato')
+                    ->options([
+                        'active'    => 'Attivo',
+                        'completed' => 'Completato',
+                        'on_hold'   => 'In Pausa',
+                        'cancelled' => 'Annullato',
+                    ])
                     ->required()
-                    ->default('active')
-                    ->maxLength(50),
+                    ->default('active'),
                 TextInput::make('progress')
+                    ->label('Avanzamento (%)')
                     ->required()
                     ->numeric()
+                    ->minValue(0)
+                    ->maxValue(100)
                     ->default(0),
                 TextInput::make('color')
+                    ->label('Colore')
                     ->required()
                     ->default('#3b82f6')
                     ->maxLength(20),
@@ -61,25 +85,50 @@ class WorkPackageResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $role = session('current_user_role');
-        $canEdit = in_array($role, ['admin', 'coordinator']);
-        $canDelete = $role === 'admin';
-
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                TextColumn::make('code')->searchable(),
-                TextColumn::make('name')->searchable(),
-                TextColumn::make('leader_id')->numeric()->sortable(),
-                TextColumn::make('start_date')->date()->sortable(),
-                TextColumn::make('end_date')->date()->sortable(),
-                TextColumn::make('duration_days')->numeric()->sortable(),
-                TextColumn::make('status')->searchable(),
-                TextColumn::make('progress')->numeric()->sortable(),
+                TextColumn::make('code')
+                    ->label('Codice')
+                    ->searchable(),
+                TextColumn::make('name')
+                    ->label('Nome')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('start_date')
+                    ->label('Inizio')
+                    ->date('d/m/Y')
+                    ->sortable(),
+                TextColumn::make('end_date')
+                    ->label('Fine')
+                    ->date('d/m/Y')
+                    ->sortable(),
+                TextColumn::make('duration_days')
+                    ->label('Giorni')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('status')
+                    ->label('Stato')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active'    => 'success',
+                        'completed' => 'info',
+                        'on_hold'   => 'warning',
+                        'cancelled' => 'danger',
+                        default     => 'gray',
+                    })
+                    ->searchable(),
+                TextColumn::make('progress')
+                    ->label('%')
+                    ->numeric()
+                    ->sortable()
+                    ->suffix('%'),
             ])
             ->recordActions([
-                EditAction::make()->visible($canEdit),
-                DeleteAction::make()->visible($canDelete),
+                EditAction::make()
+                    ->visible(fn () => auth()->user()?->hasProjectPermission('work_packages.edit')),
+                DeleteAction::make()
+                    ->visible(fn () => auth()->user()?->hasProjectPermission('work_packages.delete')),
             ]);
     }
 
@@ -90,11 +139,33 @@ class WorkPackageResource extends Resource
         ];
     }
 
-    public static function getRecordRouteBindingEloquentQuery(): Builder
+    public static function getEloquentQuery(): Builder
     {
-        return parent::getRecordRouteBindingEloquentQuery()
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+        $query = parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
+        $projectId = session('current_project_id');
+        if ($projectId) {
+            $query->where('project_id', $projectId);
+        }
+        return $query;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->hasProjectPermission('work_packages.create') ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('work_packages.edit') ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('work_packages.delete') ?? false;
+    }
+
+    public static function canView($record): bool
+    {
+        return auth()->user()?->hasProjectPermission('work_packages.view') ?? false;
     }
 }
