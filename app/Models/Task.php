@@ -6,10 +6,27 @@ use App\Traits\BelongsToProject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Task extends Model
 {
-    use HasFactory, SoftDeletes, BelongsToProject;
+    use HasFactory, SoftDeletes, BelongsToProject, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'status', 'progress', 'assigned_to', 'end_date', 'start_date'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('task')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => "Task \"{$this->name}\" creato",
+                'updated' => "Task \"{$this->name}\" aggiornato",
+                'deleted' => "Task \"{$this->name}\" eliminato",
+                default   => "Task \"{$this->name}\" {$eventName}",
+            });
+    }
     
     protected $fillable = [
         'project_id',
