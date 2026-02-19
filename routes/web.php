@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DocumentDownloadController;
+use App\Http\Controllers\GanttController;
 use App\Http\Controllers\ProjectSelectionController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,12 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/projects/switch', [ProjectSelectionController::class, 'switch'])
         ->name('projects.switch');
+
+    // ── Gantt API routes ──────────────────────────────────────────────────
+    Route::get('/gantt/data',               [GanttController::class, 'data'])->name('gantt.data');
+    Route::put('/gantt/task/{id}',          [GanttController::class, 'updateTask'])->name('gantt.task.update');
+    Route::post('/gantt/link',              [GanttController::class, 'createLink'])->name('gantt.link.create');
+    Route::delete('/gantt/link/{source}/{target}', [GanttController::class, 'deleteLink'])->name('gantt.link.delete');
 
     // Document download/preview routes (autenticato, con check permessi interno)
     Route::get('/documents/{document}/download', [DocumentDownloadController::class, 'download'])

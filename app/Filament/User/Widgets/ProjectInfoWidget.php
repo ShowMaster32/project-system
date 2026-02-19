@@ -6,6 +6,8 @@ use Filament\Widgets\Widget;
 
 class ProjectInfoWidget extends Widget
 {
+    protected static ?int $sort = 1;
+
     protected string $view = 'user.widgets.project-info-widget';
 
     protected int | string | array $columnSpan = 'full';

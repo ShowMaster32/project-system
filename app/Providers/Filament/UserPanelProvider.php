@@ -3,6 +3,9 @@
 namespace App\Providers\Filament;
 
 use App\Filament\User\Widgets\ProjectInfoWidget;
+use App\Filament\User\Widgets\ProjectStatsWidget;
+use App\Filament\User\Widgets\WorkPackageProgressWidget;
+use App\Filament\User\Widgets\UpcomingDeadlinesWidget;
 use App\Http\Middleware\CheckProjectAccess;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -40,6 +43,9 @@ class UserPanelProvider extends PanelProvider
             ->widgets([
                 AccountWidget::class,
                 ProjectInfoWidget::class,
+                ProjectStatsWidget::class,
+                WorkPackageProgressWidget::class,
+                UpcomingDeadlinesWidget::class,
             ])
             ->topNavigation()
             ->middleware([
@@ -59,8 +65,6 @@ class UserPanelProvider extends PanelProvider
             ])
             ->brandName('Project System')
             ->navigationGroups([
-                'Progetto',
-                'Documenti',
                 'Amministrazione',
             ]);
     }

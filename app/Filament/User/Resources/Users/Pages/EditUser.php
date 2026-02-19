@@ -16,7 +16,7 @@ class EditUser extends EditRecord
 
     public function getTitle(): string
     {
-        return 'Edit User: ' . $this->record->name;
+        return 'Modifica Utente: ' . $this->record->name;
     }
 
     protected function getRedirectUrl(): string
@@ -26,29 +26,32 @@ class EditUser extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        $role = session('current_user_role');
-        $isGlobalAdmin = auth()->user()?->isGlobalAdmin();
-        $canManage = ($role === 'admin') || $isGlobalAdmin;
+        $isGlobalAdmin    = auth()->user()?->isGlobalAdmin();
+        $canManage        = auth()->user()?->hasProjectPermission('users.change_role') || $isGlobalAdmin;
+        $canChangePass    = auth()->user()?->hasProjectPermission('users.edit') || $isGlobalAdmin;
         $currentProjectId = session('current_project_id');
 
         return [
-            // Azione per cambiare il ruolo dell'utente nel progetto corrente
+            // ── Cambio ruolo nel progetto ──────────────────────────────────
             Actions\Action::make('changeRole')
-                ->label('Change Project Role')
+                ->label('Cambia ruolo nel progetto')
                 ->icon('heroicon-o-user-circle')
+                ->color('warning')
                 ->visible(fn () => $canManage && $currentProjectId)
                 ->form([
                     Select::make('role')
-                        ->label('Role in Current Project')
+                        ->label('Ruolo nel progetto corrente')
                         ->options([
-                            'admin' => 'Admin',
-                            'coordinator' => 'Coordinator',
-                            'wp_leader' => 'Work Package Leader',
-                            'task_leader' => 'Task Leader',
-                            'user' => 'User',
+                            'project_admin' => 'Project Admin',
+                            'coordinator'   => 'Coordinatore',
+                            'wp_leader'     => 'WP Leader',
+                            'task_leader'   => 'Task Leader',
+                            'team_member'   => 'Team Member',
+                            'viewer'        => 'Visualizzatore',
                         ])
                         ->default(fn () => $this->record->getRoleInProject($currentProjectId))
-                        ->required(),
+                        ->required()
+                        ->native(false),
                 ])
                 ->action(function (array $data) use ($currentProjectId) {
                     $this->record->projects()->updateExistingPivot($currentProjectId, [
@@ -56,32 +59,31 @@ class EditUser extends EditRecord
                     ]);
 
                     Notification::make()
-                        ->title('Role updated successfully')
-                        ->body("User role changed to {$data['role']}")
+                        ->title('Ruolo aggiornato')
+                        ->body("Ruolo cambiato in: {$data['role']}")
                         ->success()
                         ->send();
 
-                    // Refresh la pagina per aggiornare i dati
-                    redirect()->to($this->getResource()::getUrl('edit', ['record' => $this->record]));
+                    // In Filament 4.x usa $this->redirect() non redirect() globale
+                    $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
                 }),
 
-            // Azione per cambiare password
+            // ── Cambio password ────────────────────────────────────────────
             Actions\Action::make('changePassword')
-                ->label('Change Password')
+                ->label('Cambia password')
                 ->icon('heroicon-o-key')
-                ->visible(fn () => $canManage)
+                ->color('gray')
+                ->visible(fn () => $canChangePass)
                 ->form([
                     TextInput::make('new_password')
-                        ->label('New Password')
+                        ->label('Nuova password')
                         ->password()
                         ->required()
                         ->minLength(8)
-                        ->same('new_password_confirmation')
-                        ->validationMessages([
-                            'same' => 'Passwords do not match',
-                        ]),
+                        ->confirmed(),   // cerca automaticamente new_password_confirmation
+
                     TextInput::make('new_password_confirmation')
-                        ->label('Confirm New Password')
+                        ->label('Conferma nuova password')
                         ->password()
                         ->required(),
                 ])
@@ -91,24 +93,24 @@ class EditUser extends EditRecord
                     ])->save();
 
                     Notification::make()
-                        ->title('Password updated successfully')
+                        ->title('Password aggiornata')
                         ->success()
                         ->send();
                 }),
 
-            // Azione per eliminare l'utente
+            // ── Elimina utente ─────────────────────────────────────────────
             Actions\DeleteAction::make()
-                ->visible(fn () => $canManage)
+                ->visible(fn () => auth()->user()?->hasProjectPermission('users.delete') || $isGlobalAdmin)
                 ->requiresConfirmation()
-                ->modalHeading('Delete User')
-                ->modalDescription('Are you sure you want to delete this user? This action cannot be undone.')
-                ->modalSubmitActionLabel('Yes, delete user')
-                ->successNotificationTitle('User deleted successfully'),
+                ->modalHeading('Elimina utente')
+                ->modalDescription('Sei sicuro di voler eliminare questo utente? L\'operazione non è reversibile.')
+                ->modalSubmitActionLabel('Sì, elimina')
+                ->successNotificationTitle('Utente eliminato'),
         ];
     }
 
     protected function getSavedNotificationTitle(): ?string
     {
-        return 'User updated successfully';
+        return 'Utente aggiornato con successo';
     }
 }

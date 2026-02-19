@@ -30,14 +30,9 @@ class TaskResource extends Resource
 
     protected static ?string $navigationLabel = 'Task';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'name';
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Progetto';
-    }
 
     public static function form(Schema $schema): Schema
     {
@@ -175,7 +170,8 @@ class TaskResource extends Resource
         if ($projectId) {
             $query->where('project_id', $projectId);
         }
-        return $query;
+        // Eager load workPackage per evitare N+1 nella colonna workPackage.name
+        return $query->with('workPackage:id,name,code');
     }
 
     public static function canCreate(): bool

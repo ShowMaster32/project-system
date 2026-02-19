@@ -22,16 +22,11 @@ class DocumentResource extends Resource
 {
     protected static ?string $model = Document::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-folder-open';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box';
 
-    protected static ?string $navigationLabel = 'Documenti';
+    protected static ?string $navigationLabel = 'Archivio';
 
-    protected static ?int $navigationSort = 10;
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Documenti';
-    }
+    protected static ?int $navigationSort = 4;
 
     // ──── Form ────────────────────────────────────────────────────────────
 

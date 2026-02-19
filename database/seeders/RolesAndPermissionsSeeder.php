@@ -72,15 +72,13 @@ class RolesAndPermissionsSeeder extends Seeder
             ],
         ];
 
-        // Crea tutti i permessi
+        // Crea tutti i permessi (firstOrCreate = idempotente)
         foreach ($permissions as $group => $perms) {
             foreach ($perms as $name => $description) {
-                Permission::create([
-                    'name' => $name,
-                    'guard_name' => 'web',
-                    'group' => $group,
-                    'description' => $description,
-                ]);
+                Permission::firstOrCreate(
+                    ['name' => $name, 'guard_name' => 'web'],
+                    ['group' => $group, 'description' => $description]
+                );
             }
         }
 
@@ -168,19 +166,20 @@ class RolesAndPermissionsSeeder extends Seeder
             ],
         ];
 
-        // Crea i ruoli e assegna i permessi
+        // Crea i ruoli e assegna i permessi (firstOrCreate = idempotente)
         foreach ($roles as $roleName => $config) {
-            $role = Role::create([
-                'name' => $roleName,
-                'guard_name' => 'web',
-                'description' => $config['description'],
-                'level' => $config['level'],
-                'is_default' => $config['is_default'] ?? false,
-            ]);
+            $role = Role::firstOrCreate(
+                ['name' => $roleName, 'guard_name' => 'web'],
+                [
+                    'description' => $config['description'],
+                    'level'       => $config['level'],
+                    'is_default'  => $config['is_default'] ?? false,
+                ]
+            );
 
-            // Assegna permessi (tranne per super_admin che usa Gate::before)
+            // Sincronizza sempre i permessi (tranne super_admin che usa Gate::before)
             if ($roleName !== 'super_admin') {
-                $role->givePermissionTo($config['permissions']);
+                $role->syncPermissions($config['permissions']);
             }
         }
 

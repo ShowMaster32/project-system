@@ -14,11 +14,15 @@ class ProjectSelectionController extends Controller
     {
         $user = auth()->user();
 
-        // Progetti accessibili dall'utente
+        // Progetti accessibili dall'utente (con conteggio membri, "ultimo usato" primo)
+        $lastId   = $user->last_project_id ?? 0;
         $projects = $user->projects()
             ->where('project_user.is_active', true)
             ->where('projects.is_active', true)
             ->withPivot('role')
+            ->withCount('users')
+            ->orderByRaw('(projects.id = ?) DESC', [$lastId])
+            ->orderBy('projects.name')
             ->get();
 
         // Se ha un solo progetto, entra direttamente

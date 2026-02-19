@@ -40,7 +40,7 @@ class ProjectResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Progetto';
+        return 'Amministrazione';
     }
 
     public static function form(Schema $schema): Schema
