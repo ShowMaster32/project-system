@@ -3,17 +3,19 @@
 namespace App\Filament\User\Resources\WorkPackages;
 
 use App\Filament\User\Resources\WorkPackages\Pages\ManageWorkPackages;
+use App\Models\User;
 use App\Models\WorkPackage;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -32,27 +34,47 @@ class WorkPackageResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        $projectId = session('current_project_id');
+
+        $projectUsers = User::whereHas('projects', fn ($q) => $q->where('projects.id', $projectId))
+            ->orderBy('name')
+            ->pluck('name', 'id');
+
         return $schema
-            ->schema([
+            ->components([
                 TextInput::make('code')
                     ->label('Codice')
-                    ->maxLength(50),
+                    ->maxLength(50)
+                    ->placeholder('WP01'),
+
                 TextInput::make('name')
                     ->label('Nome')
                     ->required()
                     ->maxLength(255),
+
                 Textarea::make('description')
                     ->label('Descrizione')
+                    ->rows(3)
                     ->columnSpanFull(),
+
+                Select::make('leader_id')
+                    ->label('WP Leader')
+                    ->options($projectUsers)
+                    ->searchable()
+                    ->nullable(),
+
                 DatePicker::make('start_date')
                     ->label('Data Inizio')
                     ->required(),
+
                 DatePicker::make('end_date')
                     ->label('Data Fine')
                     ->required(),
+
                 TextInput::make('duration_days')
                     ->label('Durata (giorni)')
                     ->numeric(),
+
                 Select::make('status')
                     ->label('Stato')
                     ->options([
@@ -63,6 +85,7 @@ class WorkPackageResource extends Resource
                     ])
                     ->required()
                     ->default('active'),
+
                 TextInput::make('progress')
                     ->label('Avanzamento (%)')
                     ->required()
@@ -70,11 +93,10 @@ class WorkPackageResource extends Resource
                     ->minValue(0)
                     ->maxValue(100)
                     ->default(0),
-                TextInput::make('color')
-                    ->label('Colore')
-                    ->required()
-                    ->default('#3b82f6')
-                    ->maxLength(20),
+
+                ColorPicker::make('color')
+                    ->label('Colore Gantt')
+                    ->default('#3b82f6'),
             ]);
     }
 
@@ -85,11 +107,16 @@ class WorkPackageResource extends Resource
             ->columns([
                 TextColumn::make('code')
                     ->label('Codice')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('name')
                     ->label('Nome')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap(),
+                TextColumn::make('leader.name')
+                    ->label('WP Leader')
+                    ->default('—'),
                 TextColumn::make('start_date')
                     ->label('Inizio')
                     ->date('d/m/Y')
@@ -97,11 +124,11 @@ class WorkPackageResource extends Resource
                 TextColumn::make('end_date')
                     ->label('Fine')
                     ->date('d/m/Y')
-                    ->sortable(),
-                TextColumn::make('duration_days')
-                    ->label('Giorni')
-                    ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->color(fn (WorkPackage $record) =>
+                        ! in_array($record->status, ['completed', 'cancelled'])
+                        && now()->gt($record->end_date) ? 'danger' : null
+                    ),
                 TextColumn::make('status')
                     ->label('Stato')
                     ->badge()
@@ -112,12 +139,28 @@ class WorkPackageResource extends Resource
                         'cancelled' => 'danger',
                         default     => 'gray',
                     })
-                    ->searchable(),
+                    ->formatStateUsing(fn (string $state) => match ($state) {
+                        'active'    => 'Attivo',
+                        'completed' => 'Completato',
+                        'on_hold'   => 'In Pausa',
+                        'cancelled' => 'Annullato',
+                        default     => $state,
+                    }),
                 TextColumn::make('progress')
                     ->label('%')
                     ->numeric()
                     ->sortable()
                     ->suffix('%'),
+            ])
+            ->filters([
+                SelectFilter::make('status')
+                    ->label('Stato')
+                    ->options([
+                        'active'    => 'Attivo',
+                        'completed' => 'Completato',
+                        'on_hold'   => 'In Pausa',
+                        'cancelled' => 'Annullato',
+                    ]),
             ])
             ->recordActions([
                 EditAction::make()
@@ -141,7 +184,7 @@ class WorkPackageResource extends Resource
         if ($projectId) {
             $query->where('project_id', $projectId);
         }
-        return $query;
+        return $query->with('leader:id,name');
     }
 
     public static function canCreate(): bool

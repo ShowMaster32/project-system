@@ -5,10 +5,27 @@ namespace App\Models;
 use App\Traits\BelongsToProject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Milestone extends Model
 {
-    use HasFactory, BelongsToProject;
+    use HasFactory, BelongsToProject, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'status', 'due_date', 'completed_at', 'leader_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('milestone')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => "Milestone \"{$this->name}\" creata",
+                'updated' => "Milestone \"{$this->name}\" aggiornata",
+                'deleted' => "Milestone \"{$this->name}\" eliminata",
+                default   => "Milestone \"{$this->name}\" {$eventName}",
+            });
+    }
     
     protected $fillable = [
         'project_id',

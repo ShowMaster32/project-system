@@ -5,10 +5,27 @@ namespace App\Models;
 use App\Traits\BelongsToProject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Deliverable extends Model
 {
-    use HasFactory, BelongsToProject;
+    use HasFactory, BelongsToProject, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'status', 'due_date', 'delivered_at', 'validated_at', 'responsible_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('deliverable')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => "Deliverable \"{$this->name}\" creato",
+                'updated' => "Deliverable \"{$this->name}\" aggiornato",
+                'deleted' => "Deliverable \"{$this->name}\" eliminato",
+                default   => "Deliverable \"{$this->name}\" {$eventName}",
+            });
+    }
     
     protected $fillable = [
         'project_id',

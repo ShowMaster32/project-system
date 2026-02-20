@@ -26,7 +26,7 @@ class DocumentResource extends Resource
 
     protected static ?string $navigationLabel = 'Archivio';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 6;
 
     // ──── Form ────────────────────────────────────────────────────────────
 

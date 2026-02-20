@@ -10,7 +10,7 @@ class GanttPage extends Page
 
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Gantt';
-    protected static ?int    $navigationSort  = 3;
+    protected static ?int    $navigationSort  = 5;
     protected static ?string $slug            = 'gantt';
 
     public function getTitle(): string
